@@ -47,6 +47,13 @@ function App() {
 
     return () => {
       socket.disconnect();
+      // コンポーネントアンマウント時に学習記録を保存
+      if (socketRef.current && timerSeconds > 0) {
+        trpc.saveStudyRecord.mutate({
+          userId: socketRef.current.id,
+          studyTime: timerSeconds,
+        });
+      }
     };
   }, []);
 

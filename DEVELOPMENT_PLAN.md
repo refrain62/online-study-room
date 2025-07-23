@@ -42,7 +42,8 @@ online-study-room/
     ├── src/
     │   ├── context.ts
     │   ├── index.ts
-    │   └── router.ts
+    │   ├── router.ts
+    │   └── users.ts (仮)
     ├── package.json
     ├── pnpm-lock.yaml
     └── tsconfig.json
@@ -61,7 +62,7 @@ online-study-room/
     - `server` ディレクトリに必要なライブラリ (Fastify, tRPC, Zod, Socket.IO等) を`pnpm`でインストール。
 
 ### ステップ2: バックエンドAPIとtRPCルーターの定義
-- **ステータス:** 進行中 (基本的な枠組みは完了)
+- **ステータス:** 完了
 - **完了済みの作業:**
     - `server/src` ディレクトリの作成。
     - `server/src/index.ts` (Fastifyサーバーのエントリーポイント) の作成と基本的な設定。
@@ -71,8 +72,7 @@ online-study-room/
     - `server/package.json` に `dev` スクリプトを追加。
     - `server/src/index.ts` の `fastifyTRPCPlugin` のオプションの修正。
     - `server/src/index.ts` に `@fastify/cors` を追加し、CORSを有効化。
-- **残りの作業:**
-    - 学習ルーム管理や学習記録保存のための具体的なtRPCプロシージャの定義。
+    - `server/src/router.ts` に `saveStudyRecord` tRPCプロシージャを追加。
 
 ### ステップ3: UIコンポーネント作成
 - **ステータス:** 完了
@@ -85,10 +85,14 @@ online-study-room/
     - `client/src/App.tsx` に個人タイマーのロジックとUIを実装。
 
 ### ステップ4: 機能実装 (フロントエンド + バックエンド連携)
-- **ステータス:** 未着手
+- **ステータス:** 完了
+- **完了済みの作業:**
+    - タイマーの開始/停止イベントをトリガーとしたWebSocket経由でのステータスと学習時間のサーバーへの送信を実装。
+    - 参加者リストのリアルタイム更新を実装。
+    - ルーム退出時に学習記録を保存するtRPCプロシージャの呼び出しを実装。
 
 ### ステップ5: 統合とテスト
 - **ステータス:** 未着手
 
 ## 6. 次の作業
-タイマーの開始/停止イベントをトリガーとしたWebSocket経由でのステータスと学習時間のサーバーへの送信を実装する。
+アプリケーション全体の動作確認とテストを行う。
