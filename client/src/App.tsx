@@ -239,6 +239,9 @@ function App() {
                   </Box>
                 ))
               )}
+              <Typography variant="caption" display="block" sx={{ mt: 2 }}>
+                ※参加者リストは5秒ごとに更新されます。
+              </Typography>
             </Paper>
           </Grid>
           <Grid xs={12}>
