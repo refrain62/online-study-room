@@ -32,17 +32,8 @@ function App() {
       setSocketStatus('Disconnected');
     });
 
-    socket.on('userStatusUpdate', (data: UserStatus) => {
-      setUsers((prevUsers) => {
-        const existingUserIndex = prevUsers.findIndex((user) => user.id === data.id);
-        if (existingUserIndex > -1) {
-          const newUsers = [...prevUsers];
-          newUsers[existingUserIndex] = data;
-          return newUsers;
-        } else {
-          return [...prevUsers, data];
-        }
-      });
+    socket.on('roomUsers', (data: UserStatus[]) => {
+      setUsers(data);
     });
 
     return () => {

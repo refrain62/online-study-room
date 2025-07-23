@@ -5,6 +5,7 @@ import { appRouter } from './router';
 import { createContext } from './context';
 import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify';
 import cors from '@fastify/cors';
+import { rooms, defaultRoomId } from './rooms';
 
 const fastify = Fastify({
   logger: true
@@ -31,15 +32,45 @@ fastify.register(fastifyTRPCPlugin, {
 });
 
 io.on('connection', (socket) => {
-  console.log('a user connected');
+  console.log(`a user connected: ${socket.id}`);
 
-  socket.on('updateStatus', (data) => {
-    // クライアントから送られてきたステータス情報を他のクライアントにブロードキャスト
-    io.emit('userStatusUpdate', data);
+  // ユーザーをデフォルトルームに参加させる
+  socket.join(defaultRoomId);
+  // socket.data に現在のルームIDを保存
+  socket.data.roomId = defaultRoomId;
+
+  // ユーザー情報をルームに追加
+  const currentUser = { id: socket.id, status: '休憩中', studyTime: 0 };
+  rooms[defaultRoomId].users.push(currentUser);
+
+  // ルーム内の全ユーザーに現在のユーザーリストを送信
+  io.to(defaultRoomId).emit('roomUsers', rooms[defaultRoomId].users);
+
+  socket.on('updateStatus', (data: { status: '集中中' | '休憩中'; studyTime: number }) => {
+    const roomId = socket.data.roomId;
+    if (!roomId || !rooms[roomId]) return;
+
+    // ルーム内のユーザー情報を更新
+    const userIndex = rooms[roomId].users.findIndex(user => user.id === socket.id);
+    if (userIndex > -1) {
+      rooms[roomId].users[userIndex].status = data.status;
+      rooms[roomId].users[userIndex].studyTime = data.studyTime;
+    }
+
+    // ルーム内の全ユーザーに更新されたユーザーリストを送信
+    io.to(roomId).emit('roomUsers', rooms[roomId].users);
   });
 
   socket.on('disconnect', () => {
-    console.log('user disconnected');
+    console.log(`user disconnected: ${socket.id}`);
+    const roomId = socket.data.roomId;
+    if (!roomId || !rooms[roomId]) return;
+
+    // ルームからユーザーを削除
+    rooms[roomId].users = rooms[roomId].users.filter(user => user.id !== socket.id);
+
+    // ルーム内の全ユーザーに更新されたユーザーリストを送信
+    io.to(roomId).emit('roomUsers', rooms[roomId].users);
   });
 });
 
