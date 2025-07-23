@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Container, Typography, Box, Button, Grid, Paper } from '@mui/material';
+import { Container, Typography, Box, Button, Grid, Paper, TextField, List, ListItem, ListItemText } from '@mui/material';
 import { trpc } from './trpc';
 import { io, Socket } from 'socket.io-client';
 
@@ -7,6 +7,12 @@ interface UserStatus {
   id: string;
   status: '集中中' | '休憩中';
   studyTime: number;
+}
+
+interface Room {
+  id: string;
+  name: string;
+  users: UserStatus[];
 }
 
 function App() {
@@ -17,6 +23,12 @@ function App() {
   const intervalRef = useRef<number | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const [users, setUsers] = useState<UserStatus[]>([]);
+  const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
+  const [roomNameInput, setRoomNameInput] = useState('');
+
+  const { data: rooms, refetch: refetchRooms } = trpc.getRooms.useQuery();
+  const createRoomMutation = trpc.createRoom.useMutation();
+  const joinRoomMutation = trpc.joinRoom.useMutation();
 
   useEffect(() => {
     const socket = io('http://localhost:3001');
@@ -24,8 +36,12 @@ function App() {
 
     socket.on('connect', () => {
       setSocketStatus('Connected');
-      // 接続時に自分のステータスを送信
-      socket.emit('updateStatus', { id: socket.id, status: '休憩中', studyTime: 0 });
+      // 接続時にデフォルトルームに参加
+      if (!currentRoomId) {
+        // サーバー側でデフォルトルームに参加させるので、ここでは何もしない
+        // ただし、socket.id は取得できるので、それを保存しておく
+        console.log('Connected with socket ID:', socket.id);
+      }
     });
 
     socket.on('disconnect', () => {
@@ -46,15 +62,15 @@ function App() {
         });
       }
     };
-  }, []);
+  }, [timerSeconds]); // timerSeconds を依存配列に追加
 
   useEffect(() => {
     if (isRunning) {
       intervalRef.current = window.setInterval(() => {
         setTimerSeconds((prevSeconds) => {
           const newSeconds = prevSeconds + 1;
-          if (socketRef.current) {
-            socketRef.current.emit('updateStatus', { id: socketRef.current.id, status: '集中中', studyTime: newSeconds });
+          if (socketRef.current && currentRoomId) {
+            socketRef.current.emit('updateStatus', { status: '集中中', studyTime: newSeconds });
           }
           return newSeconds;
         });
@@ -63,7 +79,7 @@ function App() {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
       if (socketRef.current) {
-        socketRef.current.emit('updateStatus', { id: socketRef.current.id, status: '休憩中', studyTime: timerSeconds });
+        socketRef.current.emit('updateStatus', { status: '休憩中', studyTime: timerSeconds });
       }
     }
     return () => {
@@ -71,7 +87,7 @@ function App() {
         clearInterval(intervalRef.current);
       }
     };
-  }, [isRunning, timerSeconds]); // timerSeconds を依存配列に追加
+  }, [isRunning, timerSeconds, currentRoomId]); // currentRoomId を依存配列に追加
 
   const formatTime = (totalSeconds: number) => {
     const hours = Math.floor(totalSeconds / 3600);
@@ -92,6 +108,31 @@ function App() {
     setIsRunning(false);
   };
 
+  const handleCreateRoom = async () => {
+    if (!roomNameInput.trim()) return;
+    try {
+      const newRoom = await createRoomMutation.mutateAsync({ roomName: roomNameInput });
+      await handleJoinRoom(newRoom.id);
+      setRoomNameInput('');
+      refetchRooms();
+    } catch (error) {
+      console.error('Failed to create room:', error);
+    }
+  };
+
+  const handleJoinRoom = async (roomId: string) => {
+    if (!socketRef.current) return;
+    try {
+      await joinRoomMutation.mutateAsync({ roomId, socketId: socketRef.current.id });
+      setCurrentRoomId(roomId);
+      // ルーム参加後、現在のステータスを送信
+      socketRef.current.emit('updateStatus', { status: isRunning ? '集中中' : '休憩中', studyTime: timerSeconds });
+      refetchRooms();
+    } catch (error) {
+      console.error('Failed to join room:', error);
+    }
+  };
+
   return (
     <Container maxWidth="md">
       <Box sx={{ my: 4 }}>
@@ -104,8 +145,37 @@ function App() {
         <Typography variant="h6" component="h2" gutterBottom>
           Socket.IO Status: {socketStatus}
         </Typography>
+        <Typography variant="h6" component="h2" gutterBottom>
+          現在のルーム: {currentRoomId ? (rooms?.find(room => room.id === currentRoomId)?.name || currentRoomId) : '未参加'}
+        </Typography>
 
         <Grid container spacing={2} sx={{ mt: 4 }}>
+          <Grid xs={12} md={6}>
+            <Paper elevation={3} sx={{ p: 2 }}>
+              <Typography variant="h5" gutterBottom>ルーム一覧</Typography>
+              <TextField
+                label="新しいルーム名"
+                variant="outlined"
+                fullWidth
+                value={roomNameInput}
+                onChange={(e) => setRoomNameInput(e.target.value)}
+                sx={{ mb: 2 }}
+              />
+              <Button variant="contained" onClick={handleCreateRoom} fullWidth sx={{ mb: 2 }}>
+                ルームを作成
+              </Button>
+              <List>
+                {rooms?.map((room) => (
+                  <ListItem key={room.id} disablePadding>
+                    <ListItemText primary={`${room.name} (${room.users.length}人)`} />
+                    <Button variant="outlined" onClick={() => handleJoinRoom(room.id)} disabled={currentRoomId === room.id}>
+                      参加
+                    </Button>
+                  </ListItem>
+                ))}
+              </List>
+            </Paper>
+          </Grid>
           <Grid xs={12} md={6}>
             <Paper elevation={3} sx={{ p: 2 }}>
               <Typography variant="h5" gutterBottom>参加者リスト</Typography>
@@ -120,15 +190,15 @@ function App() {
               )}
             </Paper>
           </Grid>
-          <Grid xs={12} md={6}>
-            <Paper elevation={3} sx={{ p: 2 }}>
+          <Grid xs={12}>
+            <Paper elevation={3} sx={{ p: 2, mt: 2 }}>
               <Typography variant="h5" gutterBottom>個人タイマー</Typography>
               <Typography variant="h3" align="center" sx={{ my: 2 }}>
                 {formatTime(timerSeconds)}
               </Typography>
               <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
-                <Button variant="contained" color="primary" onClick={handleStart} disabled={isRunning}>開始</Button>
-                <Button variant="outlined" color="secondary" onClick={handleStop} disabled={!isRunning}>停止</Button>
+                <Button variant="contained" color="primary" onClick={handleStart} disabled={isRunning || !currentRoomId}>開始</Button>
+                <Button variant="outlined" color="secondary" onClick={handleStop} disabled={!isRunning || !currentRoomId}>停止</Button>
               </Box>
             </Paper>
           </Grid>
@@ -139,4 +209,3 @@ function App() {
 }
 
 export default App;
-

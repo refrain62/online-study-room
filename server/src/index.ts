@@ -27,7 +27,7 @@ fastify.register(fastifyTRPCPlugin, {
   prefix: '/trpc',
   trpcOptions: {
     router: appRouter,
-    createContext,
+    createContext: ({ req, res }) => createContext({ req, res, io }),
   },
 });
 

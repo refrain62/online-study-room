@@ -1,10 +1,11 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
+import { Server as SocketIOServer } from 'socket.io';
 
-export function createContext({ req, res }: { req: FastifyRequest; res: FastifyReply }) {
-  // ここで認証情報などを取得し、コンテキストに含める
+export function createContext({ req, res, io }: { req: FastifyRequest; res: FastifyReply; io: SocketIOServer }) {
   return {
     req,
     res,
+    io,
   };
 }
 
