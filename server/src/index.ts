@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import { FastifyRequest, FastifyReply } from 'fastify';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { appRouter } from './router';
@@ -27,43 +28,41 @@ fastify.register(fastifyTRPCPlugin, {
   prefix: '/trpc',
   trpcOptions: {
     router: appRouter,
-    createContext: ({ req, res }) => createContext({ req, res, io }),
+    createContext: ({ req, res }: { req: FastifyRequest; res: FastifyReply }) => createContext({ req, res, io }),
   },
 });
 
 io.on('connection', (socket) => {
   console.log(`a user connected: ${socket.id}`);
 
-  // ユーザーをデフォルトルームに参加させる
-  socket.join(defaultRoomId);
+  // 接続時にユーザーをデフォルトルームに参加させる（初期化）
   // socket.data に現在のルームIDを保存
   socket.data.roomId = defaultRoomId;
-
-  // ユーザー情報をルームに追加
-  const currentUser = { id: socket.id, status: '休憩中', studyTime: 0 };
-  rooms[defaultRoomId].users.push(currentUser);
+  socket.join(defaultRoomId);
 
   // ルーム内の全ユーザーに現在のユーザーリストを送信
   io.to(defaultRoomId).emit('roomUsers', rooms[defaultRoomId].users);
 
-  socket.on('updateStatus', (data: { status: '集中中' | '休憩中'; studyTime: number }) => {
-    const roomId = socket.data.roomId;
+  socket.on('updateStatus', (data: { status: '集中中' | '休憩中'; studyTime: number; roomId: string }) => {
+    const { status, studyTime, roomId } = data;
     if (!roomId || !rooms[roomId]) return;
 
     // ルーム内のユーザー情報を更新
     const userIndex = rooms[roomId].users.findIndex(user => user.id === socket.id);
     if (userIndex > -1) {
-      rooms[roomId].users[userIndex].status = data.status;
-      rooms[roomId].users[userIndex].studyTime = data.studyTime;
+      rooms[roomId].users[userIndex].status = status;
+      rooms[roomId].users[userIndex].studyTime = studyTime;
     }
 
     // ルーム内の全ユーザーに更新されたユーザーリストを送信
     io.to(roomId).emit('roomUsers', rooms[roomId].users);
+    // 全クライアントにルームの人数更新を通知
+    io.emit('roomCountUpdate', { roomId, count: rooms[roomId].users.length });
   });
 
   socket.on('disconnect', () => {
     console.log(`user disconnected: ${socket.id}`);
-    const roomId = socket.data.roomId;
+    const roomId = socket.data.roomId; // 切断時のルームIDを取得
     if (!roomId || !rooms[roomId]) return;
 
     // ルームからユーザーを削除
@@ -71,6 +70,8 @@ io.on('connection', (socket) => {
 
     // ルーム内の全ユーザーに更新されたユーザーリストを送信
     io.to(roomId).emit('roomUsers', rooms[roomId].users);
+    // 全クライアントにルームの人数更新を通知
+    io.emit('roomCountUpdate', { roomId, count: rooms[roomId].users.length });
   });
 });
 

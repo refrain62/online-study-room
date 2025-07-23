@@ -36,12 +36,7 @@ function App() {
 
     socket.on('connect', () => {
       setSocketStatus('Connected');
-      // 接続時にデフォルトルームに参加
-      if (!currentRoomId) {
-        // サーバー側でデフォルトルームに参加させるので、ここでは何もしない
-        // ただし、socket.id は取得できるので、それを保存しておく
-        console.log('Connected with socket ID:', socket.id);
-      }
+      console.log('Connected with socket ID:', socket.id);
     });
 
     socket.on('disconnect', () => {
@@ -52,25 +47,24 @@ function App() {
       setUsers(data);
     });
 
+    // 新しいイベントハンドラを追加
+    socket.on('roomCountUpdate', (data: { roomId: string; count: number }) => {
+      refetchRooms();
+    });
+
     return () => {
       socket.disconnect();
-      // コンポーネントアンマウント時に学習記録を保存
-      if (socketRef.current && timerSeconds > 0) {
-        trpc.saveStudyRecord.mutate({
-          userId: socketRef.current.id,
-          studyTime: timerSeconds,
-        });
-      }
     };
-  }, [timerSeconds]); // timerSeconds を依存配列に追加
+  }, [refetchRooms]); // timerSeconds を依存配列に追加
 
   useEffect(() => {
     if (isRunning) {
       intervalRef.current = window.setInterval(() => {
         setTimerSeconds((prevSeconds) => {
           const newSeconds = prevSeconds + 1;
-          if (socketRef.current && currentRoomId) {
-            socketRef.current.emit('updateStatus', { status: '集中中', studyTime: newSeconds });
+          // 5秒に1回だけステータスを更新
+          if (newSeconds % 5 === 0 && socketRef.current && currentRoomId) {
+            socketRef.current.emit('updateStatus', { status: '集中中', studyTime: newSeconds, roomId: currentRoomId });
           }
           return newSeconds;
         });
@@ -78,16 +72,13 @@ function App() {
     } else if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
-      if (socketRef.current) {
-        socketRef.current.emit('updateStatus', { status: '休憩中', studyTime: timerSeconds });
-      }
     }
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
     };
-  }, [isRunning, timerSeconds, currentRoomId]); // currentRoomId を依存配列に追加
+  }, [isRunning, currentRoomId]); // timerSeconds を依存配列から削除
 
   const formatTime = (totalSeconds: number) => {
     const hours = Math.floor(totalSeconds / 3600);
@@ -102,10 +93,16 @@ function App() {
 
   const handleStart = () => {
     setIsRunning(true);
+    if (socketRef.current && currentRoomId) {
+      socketRef.current.emit('updateStatus', { status: '集中中', studyTime: timerSeconds, roomId: currentRoomId });
+    }
   };
 
   const handleStop = () => {
     setIsRunning(false);
+    if (socketRef.current && currentRoomId) {
+      socketRef.current.emit('updateStatus', { status: '休憩中', studyTime: timerSeconds, roomId: currentRoomId });
+    }
   };
 
   const handleCreateRoom = async () => {
@@ -126,7 +123,7 @@ function App() {
       await joinRoomMutation.mutateAsync({ roomId, socketId: socketRef.current.id });
       setCurrentRoomId(roomId);
       // ルーム参加後、現在のステータスを送信
-      socketRef.current.emit('updateStatus', { status: isRunning ? '集中中' : '休憩中', studyTime: timerSeconds });
+      socketRef.current.emit('updateStatus', { status: isRunning ? '集中中' : '休憩中', studyTime: timerSeconds, roomId: roomId });
       refetchRooms();
     } catch (error) {
       console.error('Failed to join room:', error);

@@ -64,8 +64,10 @@ export const appRouter = router({
       // 以前のルームから離脱
       const previousRoomId = targetSocket.data.roomId;
       if (previousRoomId && rooms[previousRoomId]) {
+        targetSocket.leave(previousRoomId); // 明示的にルームから離脱
         rooms[previousRoomId].users = rooms[previousRoomId].users.filter(user => user.id !== socketId);
         io.to(previousRoomId).emit('roomUsers', rooms[previousRoomId].users);
+        io.emit('roomCountUpdate', { roomId: previousRoomId, count: rooms[previousRoomId].users.length });
       }
 
       // 新しいルームに参加
@@ -73,7 +75,7 @@ export const appRouter = router({
       targetSocket.data.roomId = roomId;
 
       // ユーザー情報を新しいルームに追加
-      const currentUser = { id: socketId, status: '休憩中', studyTime: 0 }; // 初期ステータス
+      const currentUser: { id: string; status: '休憩中' | '集中中'; studyTime: number } = { id: socketId, status: '休憩中', studyTime: 0 }; // 初期ステータス
       rooms[roomId].users.push(currentUser);
 
       // 新しいルームの全ユーザーに更新されたユーザーリストを送信
