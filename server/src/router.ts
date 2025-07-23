@@ -91,7 +91,7 @@ export const appRouter = router({
       }
 
       // RoomServiceに処理を委譲
-      return roomService.joinRoom(socketId, roomId, targetSocket.data.roomId);
+      return roomService.joinRoom(targetSocket, roomId);
     }),
 });
 

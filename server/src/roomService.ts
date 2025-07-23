@@ -1,4 +1,4 @@
-import { Server as SocketIOServer } from 'socket.io';
+import { Server as SocketIOServer, Socket } from 'socket.io';
 import { rooms, Room, defaultRoomId } from './rooms';
 
 /**
@@ -21,9 +21,9 @@ class RoomService {
    * ユーザーをデフォルトルームに参加させ、ルーム内のユーザーリストを更新します。
    * @param {string} socketId - 接続したユーザーのSocket.IO ID。
    */
-  public handleUserConnect(socketId: string) {
+  public handleUserConnect(socket: Socket) {
     // ユーザーをデフォルトルームに追加
-    const currentUser = { id: socketId, status: '休憩中' as '休憩中' | '集中中', studyTime: 0 };
+    const currentUser = { id: socket.id, status: '休憩中' as '休憩中' | '集中中', studyTime: 0 };
     rooms[defaultRoomId].users.push(currentUser);
 
     // デフォルトルーム内の全ユーザーに更新されたユーザーリストを送信
@@ -61,27 +61,33 @@ class RoomService {
    * @returns {{ success: boolean; message: string }} 処理結果。
    * @throws {Error} ルームが見つからない場合。
    */
-  public joinRoom(socketId: string, roomId: string, previousRoomId: string | undefined): { success: boolean; message: string } {
+  public joinRoom(socket: Socket, roomId: string): { success: boolean; message: string } {
     if (!rooms[roomId]) {
       throw new Error('Room not found');
     }
 
     // 以前のルームからユーザーを削除し、関連イベントをブロードキャスト
+    const previousRoomId = socket.data.roomId;
     if (previousRoomId && rooms[previousRoomId]) {
-      rooms[previousRoomId].users = rooms[previousRoomId].users.filter(user => user.id !== socketId);
+      socket.leave(previousRoomId); // 明示的にルームから離脱
+      rooms[previousRoomId].users = rooms[previousRoomId].users.filter(user => user.id !== socket.id);
       this.io.to(previousRoomId).emit('roomUsers', rooms[previousRoomId].users);
       this.io.emit('roomCountUpdate', { roomId: previousRoomId, count: rooms[previousRoomId].users.length });
     }
 
-    // 新しいルームにユーザーを追加
-    const currentUser = { id: socketId, status: '休憩中' as '休憩中' | '集中中', studyTime: 0 }; // 初期ステータス
+    // 新しいルームに参加
+    socket.join(roomId);
+    socket.data.roomId = roomId; // socket.data.roomIdを更新
+
+    // ユーザー情報を新しいルームに追加
+    const currentUser = { id: socket.id, status: '休憩中' as '休憩中' | '集中中', studyTime: 0 }; // 初期ステータス
     rooms[roomId].users.push(currentUser);
     // 新しいルームの全ユーザーに更新されたユーザーリストを送信
     this.io.to(roomId).emit('roomUsers', rooms[roomId].users);
     // 全クライアントに新しいルームの人数更新を通知
     this.io.emit('roomCountUpdate', { roomId, count: rooms[roomId].users.length });
 
-    console.log(`User ${socketId} joined room ${roomId}`);
+    console.log(`User ${socket.id} joined room ${roomId}`);
     return { success: true, message: `Joined room ${roomId}` };
   }
 

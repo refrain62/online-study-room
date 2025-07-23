@@ -52,7 +52,7 @@ io.on('connection', (socket) => {
   // RoomServiceに処理を委譲
   socket.data.roomId = 'default-room'; // デフォルトルームIDを直接設定
   socket.join(socket.data.roomId);
-  roomService.handleUserConnect(socket.id);
+  roomService.handleUserConnect(socket);
 
   /**
    * ユーザーのステータス更新イベントハンドラ。
