@@ -30,12 +30,13 @@ fastify.register(fastifyTRPCPlugin, {
   },
 });
 
-fastify.get('/hello', async (request, reply) => {
-  return { hello: 'world' };
-});
-
 io.on('connection', (socket) => {
   console.log('a user connected');
+
+  socket.on('updateStatus', (data) => {
+    // クライアントから送られてきたステータス情報を他のクライアントにブロードキャスト
+    io.emit('userStatusUpdate', data);
+  });
 
   socket.on('disconnect', () => {
     console.log('user disconnected');

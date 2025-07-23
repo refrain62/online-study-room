@@ -70,19 +70,19 @@ online-study-room/
     - `server/tsconfig.json` の作成。
     - `server/package.json` に `dev` スクリプトを追加。
     - `server/src/index.ts` の `fastifyTRPCPlugin` のオプションの修正。
+    - `server/src/index.ts` に `@fastify/cors` を追加し、CORSを有効化。
 - **残りの作業:**
     - 学習ルーム管理や学習記録保存のための具体的なtRPCプロシージャの定義。
 
 ### ステップ3: UIコンポーネント作成
-- **ステータス:** 進行中 (基本的なUIは完了)
+- **ステータス:** 完了
 - **完了済みの作業:**
     - `client/src/theme.ts` (MUIテーマの定義) の作成。
     - `client/src/trpc.ts` (tRPCクライアントの初期化) の作成。
     - `client/src/main.tsx` に `ThemeProvider` と `QueryClientProvider` を設定。
     - `client/src/App.tsx` をオンライン学習室の基本的なUIに置き換え。
-- **残りの作業:**
-    - 参加者リストの表示コンポーネントの実装。
-    - 個人タイマーのロジックとUIの実装。
+    - `client/src/App.tsx` のMUI Gridに関する警告を修正。
+    - `client/src/App.tsx` に個人タイマーのロジックとUIを実装。
 
 ### ステップ4: 機能実装 (フロントエンド + バックエンド連携)
 - **ステータス:** 未着手
@@ -91,4 +91,4 @@ online-study-room/
 - **ステータス:** 未着手
 
 ## 6. 次の作業
-フロントエンドアプリケーションを起動し、UIの表示とtRPCおよびSocket.IOの接続が正常に行われているかを確認する。
+タイマーの開始/停止イベントをトリガーとしたWebSocket経由でのステータスと学習時間のサーバーへの送信を実装する。
