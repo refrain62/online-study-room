@@ -27,6 +27,11 @@ online-study-room/
 ├── client/
 │   ├── public/
 │   ├── src/
+│   │   ├── App.tsx
+│   │   ├── index.css
+│   │   ├── main.tsx
+│   │   ├── theme.ts
+│   │   └── trpc.ts
 │   ├── .eslintrc.cjs
 │   ├── index.html
 │   ├── package.json
@@ -34,26 +39,50 @@ online-study-room/
 │   ├── tsconfig.json
 │   └── vite.config.ts
 └── server/
+    ├── src/
+    │   ├── context.ts
+    │   ├── index.ts
+    │   └── router.ts
+    ├── package.json
+    ├── pnpm-lock.yaml
+    └── tsconfig.json
 ```
 
 ## 5. 作業計画と進捗
 
 ### ステップ1: 環境構築
-- **ステータス:** 進行中
+- **ステータス:** 完了
 - **完了済みの作業:**
     - `online-study-room` プロジェクトディレクトリの作成。
     - `client` および `server` ディレクトリの作成。
     - `client` ディレクトリにて、`pnpm` を使用してVite (React+TS)プロジェクトを初期化。
-    - `client` ディレクトリに必要なライブラリ (`@mui/material`, `@trpc/client`, `socket.io-client`等) を`pnpm`でインストール。
-- **残りの作業:**
-    - `server` ディレクトリで `pnpm init` を実行し、Node.jsプロジェクトを初期化する。
-    - `server` ディレクトリに必要なライブラリ (Fastify, tRPC, Zod, Socket.IO等) を`pnpm`でインストールする。
+    - `client` ディレクトリに必要なライブラリ (`@mui/material`, `@trpc/client`, `socket.io-client`, `@tanstack/react-query`等) を`pnpm`でインストール。
+    - `server` ディレクトリで `pnpm init` を実行し、Node.jsプロジェクトを初期化。
+    - `server` ディレクトリに必要なライブラリ (Fastify, tRPC, Zod, Socket.IO等) を`pnpm`でインストール。
 
 ### ステップ2: バックエンドAPIとtRPCルーターの定義
-- **ステータス:** 未着手
+- **ステータス:** 進行中 (基本的な枠組みは完了)
+- **完了済みの作業:**
+    - `server/src` ディレクトリの作成。
+    - `server/src/index.ts` (Fastifyサーバーのエントリーポイント) の作成と基本的な設定。
+    - `server/src/router.ts` (tRPCルーターの定義) の作成と基本的な設定。
+    - `server/src/context.ts` (tRPCコンテキストの定義) の作成。
+    - `server/tsconfig.json` の作成。
+    - `server/package.json` に `dev` スクリプトを追加。
+    - `server/src/index.ts` の `fastifyTRPCPlugin` のオプションの修正。
+- **残りの作業:**
+    - 学習ルーム管理や学習記録保存のための具体的なtRPCプロシージャの定義。
 
 ### ステップ3: UIコンポーネント作成
-- **ステータス:** 未着手
+- **ステータス:** 進行中 (基本的なUIは完了)
+- **完了済みの作業:**
+    - `client/src/theme.ts` (MUIテーマの定義) の作成。
+    - `client/src/trpc.ts` (tRPCクライアントの初期化) の作成。
+    - `client/src/main.tsx` に `ThemeProvider` と `QueryClientProvider` を設定。
+    - `client/src/App.tsx` をオンライン学習室の基本的なUIに置き換え。
+- **残りの作業:**
+    - 参加者リストの表示コンポーネントの実装。
+    - 個人タイマーのロジックとUIの実装。
 
 ### ステップ4: 機能実装 (フロントエンド + バックエンド連携)
 - **ステータス:** 未着手
@@ -62,4 +91,4 @@ online-study-room/
 - **ステータス:** 未着手
 
 ## 6. 次の作業
-`online-study-room/server` ディレクトリに移動し、`pnpm init` コマンドを実行してバックエンドプロジェクトの初期化を完了させる。
+フロントエンドアプリケーションを起動し、UIの表示とtRPCおよびSocket.IOの接続が正常に行われているかを確認する。

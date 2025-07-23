@@ -1,35 +1,65 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useEffect, useState } from 'react';
+import { Container, Typography, Box, Button, Grid, Paper } from '@mui/material';
+import { trpc } from './trpc';
+import { io } from 'socket.io-client';
 
 function App() {
-  const [count, setCount] = useState(0)
+  const health = trpc.health.useQuery();
+  const [socketStatus, setSocketStatus] = useState('Connecting...');
+
+  useEffect(() => {
+    const socket = io('http://localhost:3001');
+
+    socket.on('connect', () => {
+      setSocketStatus('Connected');
+    });
+
+    socket.on('disconnect', () => {
+      setSocketStatus('Disconnected');
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <Container maxWidth="md">
+      <Box sx={{ my: 4 }}>
+        <Typography variant="h4" component="h1" gutterBottom>
+          オンライン学習室
+        </Typography>
+        <Typography variant="h6" component="h2" gutterBottom>
+          tRPC Health Check: {health.data?.status}
+        </Typography>
+        <Typography variant="h6" component="h2" gutterBottom>
+          Socket.IO Status: {socketStatus}
+        </Typography>
+
+        <Grid container spacing={2} sx={{ mt: 4 }}>
+          <Grid item xs={12} md={6}>
+            <Paper elevation={3} sx={{ p: 2 }}>
+              <Typography variant="h5" gutterBottom>参加者リスト</Typography>
+              {/* ここにリアルタイム参加者リストを表示 */}
+              <Typography>（まだ参加者はいません）</Typography>
+            </Paper>
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <Paper elevation={3} sx={{ p: 2 }}>
+              <Typography variant="h5" gutterBottom>個人タイマー</Typography>
+              <Typography variant="h3" align="center" sx={{ my: 2 }}>
+                00:00:00
+              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
+                <Button variant="contained" color="primary">開始</Button>
+                <Button variant="outlined" color="secondary">停止</Button>
+              </Box>
+            </Paper>
+          </Grid>
+        </Grid>
+      </Box>
+    </Container>
+  );
 }
 
-export default App
+export default App;

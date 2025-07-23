@@ -18,9 +18,11 @@ const io = new SocketIOServer(httpServer, {
 });
 
 fastify.register(fastifyTRPCPlugin, {
-  prefix: '/trpc',
-  router: appRouter,
-  createContext,
+  trpcOptions: {
+    prefix: '/trpc',
+    router: appRouter,
+    createContext,
+  },
 });
 
 io.on('connection', (socket) => {
