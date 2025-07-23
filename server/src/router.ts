@@ -3,16 +3,40 @@ import { Context } from './context';
 import { z } from 'zod';
 import { rooms, Room } from './rooms';
 
+/**
+ * tRPCサーバーの初期化。
+ * createContextで定義されたコンテキストを使用します。
+ */
 const t = initTRPC.context<Context>().create();
 
+/**
+ * tRPCルーターの基盤となるオブジェクト。
+ */
 export const router = t.router;
+/**
+ * 認証不要な公開プロシージャを定義するためのオブジェクト。
+ */
 export const publicProcedure = t.procedure;
 
+/**
+ * アプリケーションのtRPCルーター定義。
+ * ここにAPIエンドポイントを定義します。
+ */
 export const appRouter = router({
+  /**
+   * ヘルスチェックエンドポイント。
+   * サーバーが正常に動作しているかを確認するために使用します。
+   */
   health: publicProcedure
     .query(() => {
       return { status: 'ok' };
     }),
+
+  /**
+   * 学習記録を保存するエンドポイント。
+   * ユーザーIDと学習時間を受け取り、記録をコンソールに出力します。
+   * 実際にはデータベースへの保存ロジックなどを追加します。
+   */
   saveStudyRecord: publicProcedure
     .input(z.object({
       userId: z.string(),
@@ -23,6 +47,11 @@ export const appRouter = router({
       // ここにデータベース保存ロジックなどを追加
       return { success: true, message: 'Study record saved' };
     }),
+
+  /**
+   * 新しい学習ルームを作成するエンドポイント。
+   * ルーム名を受け取り、ユニークなIDを持つ新しいルームを作成します。
+   */
   createRoom: publicProcedure
     .input(z.object({
       roomName: z.string().min(1),
@@ -38,10 +67,20 @@ export const appRouter = router({
       console.log(`Room created: ${newRoom.name} (${newRoom.id})`);
       return newRoom;
     }),
+
+  /**
+   * 全ての学習ルームのリストを取得するエンドポイント。
+   */
   getRooms: publicProcedure
     .query(() => {
       return Object.values(rooms);
     }),
+
+  /**
+   * ユーザーが指定されたルームに参加するエンドポイント。
+   * ルームIDとSocket.IOのソケットIDを受け取り、ユーザーをルームに参加させます。
+   * 以前参加していたルームからは離脱させ、ルーム内のユーザーリストを更新してブロードキャストします。
+   */
   joinRoom: publicProcedure
     .input(z.object({
       roomId: z.string(),
@@ -86,4 +125,9 @@ export const appRouter = router({
     }),
 });
 
+/**
+ * appRouterの型定義。
+ * クライアント側で型安全なtRPC呼び出しを行うために使用されます。
+ */
 export type AppRouter = typeof appRouter;
+

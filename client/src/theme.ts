@@ -1,5 +1,9 @@
 import { createTheme } from '@mui/material/styles';
 
+/**
+ * Material-UIのテーマを定義します。
+ * アプリケーション全体で使用される色やタイポグラフィなどのスタイルを設定します。
+ */
 const theme = createTheme({
   palette: {
     primary: {
@@ -15,3 +19,4 @@ const theme = createTheme({
 });
 
 export default theme;
+

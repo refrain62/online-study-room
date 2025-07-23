@@ -3,68 +3,96 @@ import { Container, Typography, Box, Button, Grid, Paper, TextField, List, ListI
 import { trpc } from './trpc';
 import { io, Socket } from 'socket.io-client';
 
+/**
+ * ユーザーのステータス情報を定義するインターフェース。
+ */
 interface UserStatus {
   id: string;
   status: '集中中' | '休憩中';
   studyTime: number;
 }
 
+/**
+ * ルーム情報を定義するインターフェース。
+ */
 interface Room {
   id: string;
   name: string;
   users: UserStatus[];
 }
 
+/**
+ * メインアプリケーションコンポーネント。
+ * オンライン学習室のUIとロジックを管理します。
+ */
 function App() {
+  // tRPCのヘルスチェッククエリ
   const health = trpc.health.useQuery();
-  const [socketStatus, setSocketStatus] = useState('Connecting...');
-  const [mySocketId, setMySocketId] = useState<string | null>(null);
-  const [timerSeconds, setTimerSeconds] = useState(0);
-  const [isRunning, setIsRunning] = useState(false);
-  const intervalRef = useRef<number | null>(null);
-  const socketRef = useRef<Socket | null>(null);
-  const [users, setUsers] = useState<UserStatus[]>([]);
-  const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
-  const [roomNameInput, setRoomNameInput] = useState('');
 
-  const { data: rooms, refetch: refetchRooms } = trpc.getRooms.useQuery();
-  const createRoomMutation = trpc.createRoom.useMutation();
-  const joinRoomMutation = trpc.joinRoom.useMutation();
+  // ステート変数
+  const [socketStatus, setSocketStatus] = useState('Connecting...'); // Socket.IO接続ステータス
+  const [mySocketId, setMySocketId] = useState<string | null>(null); // 自身のSocket.IO ID
+  const [timerSeconds, setTimerSeconds] = useState(0); // タイマーの秒数
+  const [isRunning, setIsRunning] = useState(false); // タイマーが実行中かどうかのフラグ
+  const intervalRef = useRef<number | null>(null); // タイマーのインターバルID
+  const socketRef = useRef<Socket | null>(null); // Socket.IOクライアントインスタンス
+  const [users, setUsers] = useState<UserStatus[]>([]); // 現在のルームのユーザーリスト
+  const [currentRoomId, setCurrentRoomId] = useState<string | null>(null); // 現在参加しているルームのID
+  const [roomNameInput, setRoomNameInput] = useState(''); // 新しいルーム名入力フィールドの値
 
+  // tRPCのルーム関連クエリとミューテーション
+  const { data: rooms, refetch: refetchRooms } = trpc.getRooms.useQuery(); // ルーム一覧取得
+  const createRoomMutation = trpc.createRoom.useMutation(); // ルーム作成ミューテーション
+  const joinRoomMutation = trpc.joinRoom.useMutation(); // ルーム参加ミューテーション
+
+  /**
+   * Socket.IOの接続とイベントリスナーの設定。
+   * コンポーネントのマウント時に一度だけ実行されます。
+   */
   useEffect(() => {
+    // Socket.IOサーバーに接続
     const socket = io('http://localhost:3001');
     socketRef.current = socket;
 
+    // 接続成功時のイベントハンドラ
     socket.on('connect', () => {
       setSocketStatus('Connected');
       setMySocketId(socket.id);
       console.log('Connected with socket ID:', socket.id);
     });
 
+    // 切断時のイベントハンドラ
     socket.on('disconnect', () => {
       setSocketStatus('Disconnected');
     });
 
+    // ルーム内のユーザーリスト更新イベントハンドラ
     socket.on('roomUsers', (data: UserStatus[]) => {
       setUsers(data);
     });
 
-    // 新しいイベントハンドラを追加
+    // ルームの人数更新イベントハンドラ（ルーム一覧を再フェッチ）
     socket.on('roomCountUpdate', (data: { roomId: string; count: number }) => {
       refetchRooms();
     });
 
+    // クリーンアップ関数：コンポーネントのアンマウント時にソケットを切断
     return () => {
       socket.disconnect();
     };
-  }, [refetchRooms]); // timerSeconds を依存配列に追加
+  }, [refetchRooms]); // refetchRoomsが変更された場合に再実行
 
+  /**
+   * タイマーのロジック。
+   * isRunningステートとcurrentRoomIdが変更されたときに実行されます。
+   */
   useEffect(() => {
     if (isRunning) {
+      // タイマーが実行中の場合、1秒ごとに秒数を更新
       intervalRef.current = window.setInterval(() => {
         setTimerSeconds((prevSeconds) => {
           const newSeconds = prevSeconds + 1;
-          // 5秒に1回だけステータスを更新
+          // 5秒に1回、サーバーにステータスを更新
           if (newSeconds % 5 === 0 && socketRef.current && currentRoomId) {
             socketRef.current.emit('updateStatus', { status: '集中中', studyTime: newSeconds, roomId: currentRoomId });
           }
@@ -72,16 +100,21 @@ function App() {
         });
       }, 1000);
     } else if (intervalRef.current) {
+      // タイマーが停止した場合、インターバルをクリア
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
+    // クリーンアップ関数：コンポーネントのアンマウント時や依存配列の変更時にインターバルをクリア
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
     };
-  }, [isRunning, currentRoomId]); // timerSeconds を依存配列から削除
+  }, [isRunning, currentRoomId]); // isRunningとcurrentRoomIdが変更された場合に再実行
 
+  /**
+   * 秒数をHH:MM:SS形式にフォーマットするヘルパー関数。
+   */
   const formatTime = (totalSeconds: number) => {
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -93,6 +126,10 @@ function App() {
     ].join(':');
   };
 
+  /**
+   * タイマー開始ボタンのハンドラ。
+   * タイマーを開始し、サーバーにステータスを送信します。
+   */
   const handleStart = () => {
     setIsRunning(true);
     if (socketRef.current && currentRoomId) {
@@ -100,6 +137,10 @@ function App() {
     }
   };
 
+  /**
+   * タイマー停止ボタンのハンドラ。
+   * タイマーを停止し、サーバーにステータスを送信します。
+   */
   const handleStop = () => {
     setIsRunning(false);
     if (socketRef.current && currentRoomId) {
@@ -107,26 +148,34 @@ function App() {
     }
   };
 
+  /**
+   * ルーム作成ボタンのハンドラ。
+   * 新しいルームを作成し、そのルームに参加します。
+   */
   const handleCreateRoom = async () => {
-    if (!roomNameInput.trim()) return;
+    if (!roomNameInput.trim()) return; // 入力がない場合は何もしない
     try {
       const newRoom = await createRoomMutation.mutateAsync({ roomName: roomNameInput });
-      await handleJoinRoom(newRoom.id);
-      setRoomNameInput('');
-      refetchRooms();
+      await handleJoinRoom(newRoom.id); // 作成したルームに参加
+      setRoomNameInput(''); // 入力フィールドをクリア
+      refetchRooms(); // ルーム一覧を再フェッチ
     } catch (error) {
       console.error('Failed to create room:', error);
     }
   };
 
+  /**
+   * ルーム参加ボタンのハンドラ。
+   * 指定されたルームに参加し、サーバーにステータスを送信します。
+   */
   const handleJoinRoom = async (roomId: string) => {
-    if (!socketRef.current) return;
+    if (!socketRef.current) return; // ソケットがない場合は何もしない
     try {
       await joinRoomMutation.mutateAsync({ roomId, socketId: socketRef.current.id });
-      setCurrentRoomId(roomId);
-      // ルーム参加後、現在のステータスを送信
+      setCurrentRoomId(roomId); // 現在のルームIDを更新
+      // ルーム参加後、現在のステータスをサーバーに送信
       socketRef.current.emit('updateStatus', { status: isRunning ? '集中中' : '休憩中', studyTime: timerSeconds, roomId: roomId });
-      refetchRooms();
+      refetchRooms(); // ルーム一覧を再フェッチ
     } catch (error) {
       console.error('Failed to join room:', error);
     }
