@@ -18,6 +18,7 @@ interface Room {
 function App() {
   const health = trpc.health.useQuery();
   const [socketStatus, setSocketStatus] = useState('Connecting...');
+  const [mySocketId, setMySocketId] = useState<string | null>(null);
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const intervalRef = useRef<number | null>(null);
@@ -36,6 +37,7 @@ function App() {
 
     socket.on('connect', () => {
       setSocketStatus('Connected');
+      setMySocketId(socket.id);
       console.log('Connected with socket ID:', socket.id);
     });
 
@@ -141,6 +143,9 @@ function App() {
         </Typography>
         <Typography variant="h6" component="h2" gutterBottom>
           Socket.IO Status: {socketStatus}
+        </Typography>
+        <Typography variant="h6" component="h2" gutterBottom>
+          My Socket ID: {mySocketId || 'Connecting...'}
         </Typography>
         <Typography variant="h6" component="h2" gutterBottom>
           現在のルーム: {currentRoomId ? (rooms?.find(room => room.id === currentRoomId)?.name || currentRoomId) : '未参加'}
