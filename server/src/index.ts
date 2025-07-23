@@ -4,6 +4,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import { appRouter } from './router';
 import { createContext } from './context';
 import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify';
+import cors from '@fastify/cors';
 
 const fastify = Fastify({
   logger: true
@@ -15,6 +16,10 @@ const io = new SocketIOServer(httpServer, {
     origin: "*", // 開発時は全て許可
     methods: ["GET", "POST"]
   }
+});
+
+fastify.register(cors, {
+  origin: "*", // 開発時は全て許可
 });
 
 fastify.register(fastifyTRPCPlugin, {
