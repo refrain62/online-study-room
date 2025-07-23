@@ -6,7 +6,8 @@ import { appRouter } from './router';
 import { createContext } from './context';
 import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify';
 import cors from '@fastify/cors';
-import { rooms, defaultRoomId } from './rooms';
+// // import { rooms, defaultRoomId } from './rooms'; // RoomService経由でアクセスするため不要
+import RoomService from './roomService';
 
 // Fastifyアプリケーションインスタンスを作成
 const fastify = Fastify({
@@ -24,6 +25,9 @@ const io = new SocketIOServer(httpServer, {
   }
 });
 
+// RoomServiceのインスタンスを作成
+const roomService = new RoomService(io);
+
 // Fastify CORSプラグインを登録
 fastify.register(cors, {
   origin: "*", // 開発時は全てのオリジンからの接続を許可
@@ -34,8 +38,8 @@ fastify.register(fastifyTRPCPlugin, {
   prefix: '/trpc', // tRPCエンドポイントのプレフィックス
   trpcOptions: {
     router: appRouter, // 定義したtRPCルーター
-    // tRPCコンテキストを作成する関数。Fastifyのリクエスト、レスポンス、Socket.IOインスタンスを渡す
-    createContext: ({ req, res }: { req: FastifyRequest; res: FastifyReply }) => createContext({ req, res, io }),
+    // tRPCコンテキストを作成する関数。Fastifyのリクエスト、レスポンス、Socket.IOインスタンス、RoomServiceを渡す
+    createContext: ({ req, res }: { req: FastifyRequest; res: FastifyReply }) => createContext({ req, res, io, roomService }),
   },
 });
 
@@ -45,11 +49,10 @@ io.on('connection', (socket) => {
 
   // 接続時にユーザーをデフォルトルームに参加させる（初期化処理）
   // socket.data に現在のルームIDを保存
-  socket.data.roomId = defaultRoomId;
-  socket.join(defaultRoomId);
-
-  // ルーム内の全ユーザーに現在のユーザーリストを送信
-  io.to(defaultRoomId).emit('roomUsers', rooms[defaultRoomId].users);
+  // RoomServiceに処理を委譲
+  socket.data.roomId = 'default-room'; // デフォルトルームIDを直接設定
+  socket.join(socket.data.roomId);
+  roomService.handleUserConnect(socket.id);
 
   /**
    * ユーザーのステータス更新イベントハンドラ。
@@ -61,19 +64,8 @@ io.on('connection', (socket) => {
    */
   socket.on('updateStatus', (data: { status: '集中中' | '休憩中'; studyTime: number; roomId: string }) => {
     const { status, studyTime, roomId } = data;
-    if (!roomId || !rooms[roomId]) return; // ルームが存在しない場合は何もしない
-
-    // ルーム内のユーザー情報を更新
-    const userIndex = rooms[roomId].users.findIndex(user => user.id === socket.id);
-    if (userIndex > -1) {
-      rooms[roomId].users[userIndex].status = status;
-      rooms[roomId].users[userIndex].studyTime = studyTime;
-    }
-
-    // ルーム内の全ユーザーに更新されたユーザーリストをブロードキャスト
-    io.to(roomId).emit('roomUsers', rooms[roomId].users);
-    // 全クライアントにルームの人数更新を通知
-    io.emit('roomCountUpdate', { roomId, count: rooms[roomId].users.length });
+    // RoomServiceに処理を委譲
+    roomService.updateUserStatus(socket.id, status, studyTime, roomId);
   });
 
   /**
@@ -83,15 +75,8 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log(`user disconnected: ${socket.id}`);
     const roomId = socket.data.roomId; // 切断時のルームIDを取得
-    if (!roomId || !rooms[roomId]) return; // ルームが存在しない場合は何もしない
-
-    // ルームからユーザーを削除
-    rooms[roomId].users = rooms[roomId].users.filter(user => user.id !== socket.id);
-
-    // ルーム内の全ユーザーに更新されたユーザーリストをブロードキャスト
-    io.to(roomId).emit('roomUsers', rooms[roomId].users);
-    // 全クライアントにルームの人数更新を通知
-    io.emit('roomCountUpdate', { roomId, count: rooms[roomId].users.length });
+    // RoomServiceに処理を委譲
+    roomService.handleUserDisconnect(socket.id, roomId);
   });
 });
 

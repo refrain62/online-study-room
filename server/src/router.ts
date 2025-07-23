@@ -1,7 +1,7 @@
 import { initTRPC } from '@trpc/server';
 import { Context } from './context';
 import { z } from 'zod';
-import { rooms, Room } from './rooms';
+// // import { rooms, Room } from './rooms'; // roomsはRoomService経由でアクセスするため不要
 
 /**
  * tRPCサーバーの初期化。
@@ -56,24 +56,18 @@ export const appRouter = router({
     .input(z.object({
       roomName: z.string().min(1),
     }))
-    .mutation(async ({ input }) => {
-      const newRoomId = Math.random().toString(36).substring(2, 9);
-      const newRoom: Room = {
-        id: newRoomId,
-        name: input.roomName,
-        users: [],
-      };
-      rooms[newRoomId] = newRoom;
-      console.log(`Room created: ${newRoom.name} (${newRoom.id})`);
-      return newRoom;
+    .mutation(async ({ input, ctx }) => {
+      const { roomService } = ctx;
+      return roomService.createRoom(input.roomName);
     }),
 
   /**
    * 全ての学習ルームのリストを取得するエンドポイント。
    */
   getRooms: publicProcedure
-    .query(() => {
-      return Object.values(rooms);
+    .query(({ ctx }) => {
+      const { roomService } = ctx;
+      return roomService.getRooms();
     }),
 
   /**
@@ -88,7 +82,7 @@ export const appRouter = router({
     }))
     .mutation(async ({ input, ctx }) => {
       const { roomId, socketId } = input;
-      const { io } = ctx;
+      const { io, roomService } = ctx;
 
       const targetSocket = io.sockets.sockets.get(socketId);
 
@@ -96,32 +90,8 @@ export const appRouter = router({
         throw new Error('Socket not found');
       }
 
-      if (!rooms[roomId]) {
-        throw new Error('Room not found');
-      }
-
-      // 以前のルームから離脱
-      const previousRoomId = targetSocket.data.roomId;
-      if (previousRoomId && rooms[previousRoomId]) {
-        targetSocket.leave(previousRoomId); // 明示的にルームから離脱
-        rooms[previousRoomId].users = rooms[previousRoomId].users.filter(user => user.id !== socketId);
-        io.to(previousRoomId).emit('roomUsers', rooms[previousRoomId].users);
-        io.emit('roomCountUpdate', { roomId: previousRoomId, count: rooms[previousRoomId].users.length });
-      }
-
-      // 新しいルームに参加
-      targetSocket.join(roomId);
-      targetSocket.data.roomId = roomId;
-
-      // ユーザー情報を新しいルームに追加
-      const currentUser: { id: string; status: '休憩中' | '集中中'; studyTime: number } = { id: socketId, status: '休憩中', studyTime: 0 }; // 初期ステータス
-      rooms[roomId].users.push(currentUser);
-
-      // 新しいルームの全ユーザーに更新されたユーザーリストを送信
-      io.to(roomId).emit('roomUsers', rooms[roomId].users);
-
-      console.log(`User ${socketId} joined room ${roomId}`);
-      return { success: true, message: `Joined room ${roomId}` };
+      // RoomServiceに処理を委譲
+      return roomService.joinRoom(socketId, roomId, targetSocket.data.roomId);
     }),
 });
 

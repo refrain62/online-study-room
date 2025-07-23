@@ -1,21 +1,24 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { Server as SocketIOServer } from 'socket.io';
+import RoomService from './roomService';
 
 /**
  * tRPCコンテキストを作成する関数。
- * Fastifyのリクエスト、レスポンス、Socket.IOサーバーインスタンスをコンテキストとして提供します。
+ * Fastifyのリクエスト、レスポンス、Socket.IOサーバーインスタンス、およびRoomServiceをコンテキストとして提供します。
  * これにより、tRPCプロシージャ内でこれらのオブジェクトにアクセスできるようになります。
  * @param {Object} params - パラメータオブジェクト
  * @param {FastifyRequest} params.req - Fastifyのリクエストオブジェクト
  * @param {FastifyReply} params.res - Fastifyのレスポンスオブジェクト
  * @param {SocketIOServer} params.io - Socket.IOサーバーインスタンス
+ * @param {RoomService} params.roomService - RoomServiceインスタンス
  * @returns {Object} コンテキストオブジェクト
  */
-export function createContext({ req, res, io }: { req: FastifyRequest; res: FastifyReply; io: SocketIOServer }) {
+export function createContext({ req, res, io, roomService }: { req: FastifyRequest; res: FastifyReply; io: SocketIOServer; roomService: RoomService }) {
   return {
     req,
     res,
     io,
+    roomService,
   };
 }
 
