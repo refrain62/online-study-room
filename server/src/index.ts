@@ -23,11 +23,15 @@ fastify.register(cors, {
 });
 
 fastify.register(fastifyTRPCPlugin, {
+  prefix: '/trpc',
   trpcOptions: {
-    prefix: '/trpc',
     router: appRouter,
     createContext,
   },
+});
+
+fastify.get('/hello', async (request, reply) => {
+  return { hello: 'world' };
 });
 
 io.on('connection', (socket) => {
